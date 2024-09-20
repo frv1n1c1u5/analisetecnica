@@ -1,10 +1,16 @@
+import os
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 import ta  # Biblioteca para análise técnica
 import plotly.graph_objects as go
 from datetime import datetime
 import io
+
+# Instalar yfinance se não estiver instalado
+os.system('pip install yfinance')
+
+# Importar yfinance após garantir que ele foi instalado
+import yfinance as yf
 
 # Função para carregar os dados do ativo selecionado
 @st.cache_data
