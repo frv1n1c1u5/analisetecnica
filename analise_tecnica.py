@@ -12,10 +12,17 @@ os.system('pip install yfinance')
 # Importar yfinance após garantir que ele foi instalado
 import yfinance as yf
 
-# Função para carregar os dados do ativo selecionado
+# Função para carregar os dados do ativo selecionado e filtrar apenas dias úteis
 @st.cache_data
 def carregar_dados(ativo, periodo):
-    return yf.download(ativo, period=periodo, interval="1d", progress=False)  # Desativa a barra de progresso e ajusta o intervalo
+    # Baixar dados do yfinance
+    data = yf.download(ativo, period=periodo, interval="1d", progress=False)
+
+    # Filtrar apenas dias úteis
+    dias_uteis = pd.bdate_range(start=data.index.min(), end=data.index.max())
+    data = data[data.index.isin(dias_uteis)]
+    
+    return data
 
 # Função para plotar gráfico de candle com indicadores sobrepostos
 def plotar_candle_com_indicadores(data, indicadores_selecionados):
