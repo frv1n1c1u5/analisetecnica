@@ -23,7 +23,7 @@ def carregar_dados(ativo, periodo):
     
     return data
 
-# Função para plotar gráfico de candle com indicadores sobrepostos
+# Função para plotar gráfico de candle com todos os indicadores sobrepostos
 def plotar_candle_com_indicadores(data, indicadores_selecionados):
     fig = go.Figure()
 
@@ -33,34 +33,37 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
     # Adiciona os indicadores selecionados sobre o gráfico de candle
     if "Média Móvel" in indicadores_selecionados:
         data['SMA'] = ta.trend.SMAIndicator(data['Close'], window=14).sma_indicator()
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA'], mode='lines', name='Média Móvel'))
+        fig.add_trace(go.Scatter(x=data.index, y=data['SMA'], mode='lines', name='Média Móvel', line=dict(color='blue')))
     
     if "RSI" in indicadores_selecionados:
         data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-        fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2"))
+        # Como o RSI é em outra escala, vamos adicionar como um eixo secundário
+        fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2", line=dict(color='green')))
 
     if "MACD" in indicadores_selecionados:
         macd = ta.trend.MACD(data['Close'])
         data['MACD'] = macd.macd()
         data['Signal'] = macd.macd_signal()
-        fig.add_trace(go.Scatter(x=data.index, y=data['MACD'], mode='lines', name='MACD'))
-        fig.add_trace(go.Scatter(x=data.index, y=data['Signal'], mode='lines', name='Signal MACD'))
+        fig.add_trace(go.Scatter(x=data.index, y=data['MACD'], mode='lines', name='MACD', line=dict(color='orange')))
+        fig.add_trace(go.Scatter(x=data.index, y=data['Signal'], mode='lines', name='Signal MACD', line=dict(color='purple')))
 
     if "Bandas de Bollinger" in indicadores_selecionados:
         bb = ta.volatility.BollingerBands(data['Close'])
         data['BB_upper'] = bb.bollinger_hband()
         data['BB_middle'] = bb.bollinger_mavg()
         data['BB_lower'] = bb.bollinger_lband()
-        fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], mode='lines', name='Banda Superior'))
-        fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], mode='lines', name='Banda Média'))
-        fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='Banda Inferior'))
+        fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], mode='lines', name='Banda Superior', line=dict(color='red')))
+        fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], mode='lines', name='Banda Média', line=dict(color='yellow')))
+        fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='Banda Inferior', line=dict(color='red')))
 
     # Atualiza layout para permitir o uso de eixos duplos (exemplo com RSI)
     fig.update_layout(
         title='Gráfico de Candle com Indicadores',
         yaxis_title='Preço',
         xaxis_title='Data',
-        yaxis2=dict(title='RSI', overlaying='y', side='right', range=[0, 100], showgrid=False)
+        yaxis2=dict(title='RSI', overlaying='y', side='right', range=[0, 100], showgrid=False),
+        legend_title_text="Indicadores",
+        xaxis_rangeslider_visible=False  # Desativa o range slider
     )
 
     st.plotly_chart(fig)
@@ -97,29 +100,6 @@ plotar_candle_com_indicadores(dados, indicadores)
 # Botão para exportar gráfico
 if st.button("Exportar gráfico"):
     exportar_grafico(dados)
-
-# Modo de Desempenho
-modo_desempenho = st.sidebar.checkbox("Ativar Modo de Desempenho (Gráficos Simplificados)")
-if modo_desempenho:
-    st.write("Modo de Desempenho ativado. Gráficos simplificados.")
-    # Implementar lógica de gráficos simplificados aqui
-
-# Barra de progresso durante o carregamento dos dados
-with st.spinner('Processando...'):
-    st.success('Processamento concluído com sucesso!')
-
-# Tutorial
-if st.sidebar.button("Mostrar Tutorial"):
-    st.info("""
-        Passo 1: Selecione um ativo no menu à esquerda.\n
-        Passo 2: Escolha o período de tempo para a análise (ex: 1 mês, 3 meses, 1 ano).\n
-        Passo 3: Adicione indicadores técnicos, se necessário.\n
-        Passo 4: Exporte o gráfico como imagem usando o botão apropriado.\n
-        Passo 5: Utilize a opção de Long & Short para comparar dois ativos simultaneamente.
-    """)
-
-# Mensagem de feedback final
-st.sidebar.write("Obrigado por utilizar o app. Se tiver dúvidas, consulte o tutorial ou tente iniciar uma nova análise.")
 
 # Cache - Limpar manualmente
 if st.sidebar.button("Limpar Cache"):
