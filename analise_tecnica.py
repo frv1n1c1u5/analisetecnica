@@ -12,15 +12,14 @@ os.system('pip install yfinance')
 # Importar yfinance após garantir que ele foi instalado
 import yfinance as yf
 
-# Função para carregar os dados do ativo selecionado e filtrar apenas dias úteis
+# Função para carregar os dados do ativo selecionado e remover dias sem pregão
 @st.cache_data
 def carregar_dados(ativo, periodo):
     # Baixar dados do yfinance
     data = yf.download(ativo, period=periodo, interval="1d", progress=False)
-
-    # Filtrar apenas dias úteis
-    dias_uteis = pd.bdate_range(start=data.index.min(), end=data.index.max())
-    data = data[data.index.isin(dias_uteis)]
+    
+    # Remover dias sem pregão (linhas onde 'Volume' é 0, indicando ausência de negociações)
+    data = data[data['Volume'] > 0]
     
     return data
 
@@ -80,7 +79,7 @@ st.title("Análise Técnica de Ativos - B3")
 st.sidebar.header("Configurações")
 
 # Seção de seleção de ativos e período
-ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA"]  # Exemplos de ativos da B3
+ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA", "USIM5.SA", "CSNA3.SA", "EMBR3.SA", "BRKM5.SA"]  # Adiciona mais empresas da B3
 ativo = st.sidebar.selectbox("Selecione o ativo", ativos)
 periodo = st.sidebar.selectbox("Período", ["1d", "1mo", "3mo", "1y", "5y"])
 
