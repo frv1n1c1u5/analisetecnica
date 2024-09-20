@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 import ta  # Biblioteca alternativa para análise técnica
 import plotly.graph_objects as go
-from datetime import datetime
 import io
 
 # Instalar yfinance se não estiver instalado
@@ -37,7 +36,7 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
     
     if "RSI" in indicadores_selecionados:
         data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-        # Como o RSI é em outra escala, vamos adicionar como um eixo secundário
+        # O RSI é plotado em outro eixo, mas sobreposto
         fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2", line=dict(color='green')))
 
     if "MACD" in indicadores_selecionados:
@@ -62,7 +61,6 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
         yaxis_title='Preço',
         xaxis_title='Data',
         yaxis2=dict(title='RSI', overlaying='y', side='right', range=[0, 100], showgrid=False),
-        legend_title_text="Indicadores",
         xaxis_rangeslider_visible=False  # Desativa o range slider
     )
 
