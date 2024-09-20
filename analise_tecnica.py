@@ -1,15 +1,19 @@
 import os
 import streamlit as st
 import pandas as pd
+import numpy as np
 import ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import io
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from datetime import datetime, timedelta
+import requests
 
-# Instalar yfinance se não estiver instalado
-os.system('pip install yfinance')
+# Instalar bibliotecas necessárias
+os.system('pip install yfinance pandas numpy scikit-learn requests')
 
-# Importar yfinance após garantir que ele foi instalado
 import yfinance as yf
 
 @st.cache_data
@@ -59,22 +63,58 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
     fig.update_xaxes(rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
 
-def exportar_grafico(dados):
-    fig = go.Figure(data=[go.Candlestick(
-        x=dados.index, open=dados['Open'], high=dados['High'], low=dados['Low'], close=dados['Close'])])
-    
-    buf = io.BytesIO()
-    fig.write_image(buf, format='png')
-    st.download_button("Baixar gráfico", buf.getvalue(), file_name="grafico_candle.png", mime="image/png")
+def obter_dados_fundamentalistas(ativo):
+    ticker = yf.Ticker(ativo)
+    info = ticker.info
+    return {
+        "P/L": info.get('trailingPE', 'N/A'),
+        "Dividend Yield": info.get('dividendYield', 'N/A'),
+        "Valor de Mercado": info.get('marketCap', 'N/A'),
+        "Receita": info.get('totalRevenue', 'N/A'),
+        "Lucro Líquido": info.get('netIncomeToCommon', 'N/A'),
+    }
 
-st.title("Análise Técnica de Ativos - B3")
+def realizar_previsao(data):
+    df = data.copy()
+    df['Predict'] = df['Close'].shift(-1)
+    df = df.dropna()
+    X = np.array(df.index.astype(int).values).reshape(-1, 1)
+    y = np.array(df['Predict'])
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    
+    last_date = df.index[-1]
+    next_date = last_date + timedelta(days=1)
+    next_date_int = int(next_date.timestamp())
+    predicted_price = model.predict([[next_date_int]])[0]
+    
+    return predicted_price, model.score(X_test, y_test)
+
+def exportar_dados(data):
+    csv = data.to_csv().encode('utf-8')
+    st.download_button(
+        label="Baixar dados como CSV",
+        data=csv,
+        file_name="dados_ativo.csv",
+        mime="text/csv",
+    )
+
+def obter_noticias(ativo):
+    # Substitua 'SUA_CHAVE_API' pela sua chave real da API de notícias
+    url = f"https://newsapi.org/v2/everything?q={ativo}&apiKey=SUA_CHAVE_API"
+    response = requests.get(url)
+    if response.status_code == 200:
+        news = response.json()['articles'][:5]  # Pegando as 5 primeiras notícias
+        return news
+    else:
+        return None
+
+st.title("Análise Técnica e Fundamental de Ativos - B3")
 st.sidebar.header("Configurações")
 
-# Entrada de código de ativo
 codigo_ativo = st.sidebar.text_input("Digite o código do ativo (ex: PETR4.SA)")
-
-# Seção de seleção de período
-periodo = st.sidebar.selectbox("Período", ["1d", "1mo", "3mo", "1y", "5y"])
+periodo = st.sidebar.selectbox("Período", ["1mo", "3mo", "6mo", "1y", "2y", "5y"])
 
 if codigo_ativo:
     st.sidebar.write(f"Carregando dados para {codigo_ativo}...")
@@ -85,8 +125,33 @@ if codigo_ativo:
     st.subheader(f"Gráfico de Candle com Indicadores para {codigo_ativo}")
     plotar_candle_com_indicadores(dados, indicadores)
 
-    if st.button("Exportar gráfico"):
-        exportar_grafico(dados)
+    # Análise Fundamentalista
+    st.subheader("Dados Fundamentalistas")
+    dados_fundamentalistas = obter_dados_fundamentalistas(codigo_ativo)
+    st.write(dados_fundamentalistas)
+
+    # Previsões
+    st.subheader("Previsão de Preço")
+    preco_previsto, score = realizar_previsao(dados)
+    st.write(f"Preço previsto para o próximo dia: R$ {preco_previsto:.2f}")
+    st.write(f"Precisão do modelo: {score:.2%}")
+
+    # Exportação de dados
+    st.subheader("Exportar Dados")
+    exportar_dados(dados)
+
+    # Notícias
+    st.subheader("Notícias Relacionadas")
+    noticias = obter_noticias(codigo_ativo)
+    if noticias:
+        for noticia in noticias:
+            st.write(f"**{noticia['title']}**")
+            st.write(noticia['description'])
+            st.write(f"[Leia mais]({noticia['url']})")
+            st.write("---")
+    else:
+        st.write("Não foi possível carregar as notícias no momento.")
+
 else:
     st.sidebar.write("Digite o código de um ativo para começar.")
 
