@@ -15,35 +15,49 @@ import yfinance as yf
 # Função para carregar os dados do ativo selecionado
 @st.cache_data
 def carregar_dados(ativo, periodo):
-    return yf.download(ativo, period=periodo, progress=False)  # Desativa a barra de progresso
+    return yf.download(ativo, period=periodo, interval="1d", progress=False)  # Desativa a barra de progresso e ajusta o intervalo
 
-# Função para plotar gráfico de candle
-def plotar_candle(data):
-    fig = go.Figure(data=[go.Candlestick(
-        x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'])])
-    fig.update_layout(title='Gráfico de Candle', xaxis_title='Data', yaxis_title='Preço')
-    st.plotly_chart(fig)
+# Função para plotar gráfico de candle com indicadores sobrepostos
+def plotar_candle_com_indicadores(data, indicadores_selecionados):
+    fig = go.Figure()
 
-# Função para adicionar indicadores técnicos
-def adicionar_indicadores(data, indicadores_selecionados):
+    # Gráfico de candle
+    fig.add_trace(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name='Candlestick'))
+
+    # Adiciona os indicadores selecionados sobre o gráfico de candle
     if "Média Móvel" in indicadores_selecionados:
         data['SMA'] = ta.trend.SMAIndicator(data['Close'], window=14).sma_indicator()
-        st.line_chart(data[['Close', 'SMA']])
+        fig.add_trace(go.Scatter(x=data.index, y=data['SMA'], mode='lines', name='Média Móvel'))
+    
     if "RSI" in indicadores_selecionados:
         data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-        st.line_chart(data[['RSI']])
+        fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2"))
+
     if "MACD" in indicadores_selecionados:
         macd = ta.trend.MACD(data['Close'])
         data['MACD'] = macd.macd()
         data['Signal'] = macd.macd_signal()
-        st.line_chart(data[['MACD', 'Signal']])
+        fig.add_trace(go.Scatter(x=data.index, y=data['MACD'], mode='lines', name='MACD'))
+        fig.add_trace(go.Scatter(x=data.index, y=data['Signal'], mode='lines', name='Signal MACD'))
+
     if "Bandas de Bollinger" in indicadores_selecionados:
         bb = ta.volatility.BollingerBands(data['Close'])
         data['BB_upper'] = bb.bollinger_hband()
         data['BB_middle'] = bb.bollinger_mavg()
         data['BB_lower'] = bb.bollinger_lband()
-        st.line_chart(data[['Close', 'BB_upper', 'BB_middle', 'BB_lower']])
-    return data
+        fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], mode='lines', name='Banda Superior'))
+        fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], mode='lines', name='Banda Média'))
+        fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='Banda Inferior'))
+
+    # Atualiza layout para permitir o uso de eixos duplos (exemplo com RSI)
+    fig.update_layout(
+        title='Gráfico de Candle com Indicadores',
+        yaxis_title='Preço',
+        xaxis_title='Data',
+        yaxis2=dict(title='RSI', overlaying='y', side='right', range=[0, 100], showgrid=False)
+    )
+
+    st.plotly_chart(fig)
 
 # Função para exportar gráfico como imagem
 def exportar_grafico(dados):
@@ -61,21 +75,18 @@ st.sidebar.header("Configurações")
 # Seção de seleção de ativos e período
 ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA"]  # Exemplos de ativos da B3
 ativo = st.sidebar.selectbox("Selecione o ativo", ativos)
-periodo = st.sidebar.selectbox("Período", ["1mo", "3mo", "1y", "5y"])
+periodo = st.sidebar.selectbox("Período", ["1d", "1mo", "3mo", "1y", "5y"])
 
 # Carregar dados do ativo
 st.sidebar.write("Carregando dados...")
 dados = carregar_dados(ativo, periodo)
 
-# Exibir gráfico de candle
-st.subheader(f"Gráfico de Candle para {ativo}")
-plotar_candle(dados)
-
 # Seleção de indicadores técnicos
 indicadores = st.sidebar.multiselect("Selecione os indicadores técnicos", ["Média Móvel", "RSI", "MACD", "Bandas de Bollinger"])
 
-# Adicionar indicadores técnicos
-dados_com_indicadores = adicionar_indicadores(dados, indicadores)
+# Exibir gráfico de candle com indicadores sobrepostos
+st.subheader(f"Gráfico de Candle com Indicadores para {ativo}")
+plotar_candle_com_indicadores(dados, indicadores)
 
 # Botão para exportar gráfico
 if st.button("Exportar gráfico"):
