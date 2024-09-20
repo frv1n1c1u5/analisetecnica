@@ -79,7 +79,7 @@ st.title("Análise Técnica de Ativos - B3")
 st.sidebar.header("Configurações")
 
 # Seção de seleção de ativos e período
-ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA", "USIM5.SA", "CSNA3.SA", "EMBR3.SA", "BRKM5.SA"]  # Incluindo as novas empresas da B3
+ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA", "USIM5.SA", "CSNA3.SA", "EMBR3.SA", "BRKM5.SA"]  # Adiciona mais empresas da B3
 ativo = st.sidebar.selectbox("Selecione o ativo", ativos)
 periodo = st.sidebar.selectbox("Período", ["1d", "1mo", "3mo", "1y", "5y"])
 
