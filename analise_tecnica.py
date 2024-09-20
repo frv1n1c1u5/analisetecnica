@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import pandas as pd
-import ta  # Biblioteca para análise técnica
+import ta  # Biblioteca alternativa para análise técnica
 import plotly.graph_objects as go
 from datetime import datetime
 import io
@@ -15,7 +15,7 @@ import yfinance as yf
 # Função para carregar os dados do ativo selecionado
 @st.cache_data
 def carregar_dados(ativo, periodo):
-    return yf.download(ativo, period=periodo)
+    return yf.download(ativo, period=periodo, progress=False)  # Desativa a barra de progresso
 
 # Função para plotar gráfico de candle
 def plotar_candle(data):
@@ -27,10 +27,10 @@ def plotar_candle(data):
 # Função para adicionar indicadores técnicos
 def adicionar_indicadores(data, indicadores_selecionados):
     if "Média Móvel" in indicadores_selecionados:
-        data['SMA'] = ta.trend.sma_indicator(data['Close'], window=14)
+        data['SMA'] = ta.trend.SMAIndicator(data['Close'], window=14).sma_indicator()
         st.line_chart(data[['Close', 'SMA']])
     if "RSI" in indicadores_selecionados:
-        data['RSI'] = ta.momentum.rsi(data['Close'], window=14)
+        data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
         st.line_chart(data[['RSI']])
     if "MACD" in indicadores_selecionados:
         macd = ta.trend.MACD(data['Close'])
@@ -38,7 +38,10 @@ def adicionar_indicadores(data, indicadores_selecionados):
         data['Signal'] = macd.macd_signal()
         st.line_chart(data[['MACD', 'Signal']])
     if "Bandas de Bollinger" in indicadores_selecionados:
-        data['BB_upper'], data['BB_middle'], data['BB_lower'] = ta.volatility.bollinger_hband(data['Close']), ta.volatility.bollinger_mavg(data['Close']), ta.volatility.bollinger_lband(data['Close'])
+        bb = ta.volatility.BollingerBands(data['Close'])
+        data['BB_upper'] = bb.bollinger_hband()
+        data['BB_middle'] = bb.bollinger_mavg()
+        data['BB_lower'] = bb.bollinger_lband()
         st.line_chart(data[['Close', 'BB_upper', 'BB_middle', 'BB_lower']])
     return data
 
