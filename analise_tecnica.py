@@ -17,8 +17,8 @@ def carregar_dados(ativo, periodo):
     # Baixar dados do yfinance
     data = yf.download(ativo, period=periodo, interval="1d", progress=False)
     
-    # Remover dias sem pregão (linhas onde 'Volume' é 0, indicando ausência de negociações)
-    data = data[data['Volume'] > 0]
+    # Remover dias sem pregão (fins de semana e feriados), ou seja, onde 'Volume' é 0
+    data = data[data['Volume'] > 0].dropna()  # Filtra apenas dias com volume negociado
     
     return data
 
@@ -36,7 +36,6 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
     
     if "RSI" in indicadores_selecionados:
         data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-        # O RSI é plotado em outro eixo, mas sobreposto
         fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2", line=dict(color='green')))
 
     if "MACD" in indicadores_selecionados:
@@ -80,7 +79,7 @@ st.title("Análise Técnica de Ativos - B3")
 st.sidebar.header("Configurações")
 
 # Seção de seleção de ativos e período
-ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA", "USIM5.SA", "CSNA3.SA", "EMBR3.SA", "BRKM5.SA"]  # Adiciona mais empresas da B3
+ativos = ["PETR4.SA", "VALE3.SA", "ITUB4.SA", "USIM5.SA", "CSNA3.SA", "EMBR3.SA", "BRKM5.SA"]  # Incluindo as novas empresas da B3
 ativo = st.sidebar.selectbox("Selecione o ativo", ativos)
 periodo = st.sidebar.selectbox("Período", ["1d", "1mo", "3mo", "1y", "5y"])
 
