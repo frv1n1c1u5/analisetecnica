@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import ta
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import io
 
 # Instalar yfinance se não estiver instalado
@@ -18,7 +19,7 @@ def carregar_dados(ativo, periodo):
     return data
 
 def plotar_candle_com_indicadores(data, indicadores_selecionados):
-    fig = go.Figure()
+    fig = make_subplots(rows=1, cols=1, shared_xaxes=True, vertical_spacing=0.03, subplot_titles=('Preço e Indicadores',))
 
     fig.add_trace(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name='Candlestick'))
 
@@ -28,7 +29,7 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
     
     if "RSI" in indicadores_selecionados:
         data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-        fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2", line=dict(color='green')))
+        fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', line=dict(color='green')))
 
     if "MACD" in indicadores_selecionados:
         macd = ta.trend.MACD(data['Close'])
@@ -48,13 +49,15 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
 
     fig.update_layout(
         title='Gráfico de Candle com Indicadores',
-        yaxis_title='Preço',
+        yaxis_title='Preço / Valor do Indicador',
         xaxis_title='Data',
-        yaxis2=dict(title='RSI', overlaying='y', side='right', range=[0, 100], showgrid=False),
-        xaxis_rangeslider_visible=False
+        height=600,
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
-    st.plotly_chart(fig)
+    fig.update_xaxes(rangeslider_visible=False)
+    st.plotly_chart(fig, use_container_width=True)
 
 def exportar_grafico(dados):
     fig = go.Figure(data=[go.Candlestick(
