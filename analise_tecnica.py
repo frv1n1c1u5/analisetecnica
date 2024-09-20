@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import pandas as pd
-import ta  # Biblioteca alternativa para análise técnica
+import ta
 import plotly.graph_objects as go
 import io
 
@@ -11,25 +11,17 @@ os.system('pip install yfinance')
 # Importar yfinance após garantir que ele foi instalado
 import yfinance as yf
 
-# Função para carregar os dados do ativo selecionado e remover dias sem pregão
 @st.cache_data
 def carregar_dados(ativo, periodo):
-    # Baixar dados do yfinance
     data = yf.download(ativo, period=periodo, interval="1d", progress=False)
-    
-    # Remover dias sem pregão (fins de semana e feriados), ou seja, onde 'Volume' é 0
-    data = data[data['Volume'] > 0].dropna()  # Filtra apenas dias com volume negociado
-    
+    data = data[data['Volume'] > 0].dropna()
     return data
 
-# Função para plotar gráfico de candle com todos os indicadores sobrepostos
 def plotar_candle_com_indicadores(data, indicadores_selecionados):
     fig = go.Figure()
 
-    # Gráfico de candle
     fig.add_trace(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name='Candlestick'))
 
-    # Adiciona os indicadores selecionados sobre o gráfico de candle
     if "Média Móvel" in indicadores_selecionados:
         data['SMA'] = ta.trend.SMAIndicator(data['Close'], window=14).sma_indicator()
         fig.add_trace(go.Scatter(x=data.index, y=data['SMA'], mode='lines', name='Média Móvel', line=dict(color='blue')))
@@ -54,18 +46,16 @@ def plotar_candle_com_indicadores(data, indicadores_selecionados):
         fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], mode='lines', name='Banda Média', line=dict(color='yellow')))
         fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='Banda Inferior', line=dict(color='red')))
 
-    # Atualiza layout para permitir o uso de eixos duplos (exemplo com RSI)
     fig.update_layout(
         title='Gráfico de Candle com Indicadores',
         yaxis_title='Preço',
         xaxis_title='Data',
         yaxis2=dict(title='RSI', overlaying='y', side='right', range=[0, 100], showgrid=False),
-        xaxis_rangeslider_visible=False  # Desativa o range slider
+        xaxis_rangeslider_visible=False
     )
 
     st.plotly_chart(fig)
 
-# Função para exportar gráfico como imagem
 def exportar_grafico(dados):
     fig = go.Figure(data=[go.Candlestick(
         x=dados.index, open=dados['Open'], high=dados['High'], low=dados['Low'], close=dados['Close'])])
@@ -74,7 +64,6 @@ def exportar_grafico(dados):
     fig.write_image(buf, format='png')
     st.download_button("Baixar gráfico", buf.getvalue(), file_name="grafico_candle.png", mime="image/png")
 
-# Interface do usuário
 st.title("Análise Técnica de Ativos - B3")
 st.sidebar.header("Configurações")
 
@@ -84,26 +73,20 @@ codigo_ativo = st.sidebar.text_input("Digite o código do ativo (ex: PETR4.SA)")
 # Seção de seleção de período
 periodo = st.sidebar.selectbox("Período", ["1d", "1mo", "3mo", "1y", "5y"])
 
-# Verifica se o código do ativo foi fornecido
 if codigo_ativo:
-    # Carregar dados do ativo
     st.sidebar.write(f"Carregando dados para {codigo_ativo}...")
     dados = carregar_dados(codigo_ativo, periodo)
 
-    # Seleção de indicadores técnicos
     indicadores = st.sidebar.multiselect("Selecione os indicadores técnicos", ["Média Móvel", "RSI", "MACD", "Bandas de Bollinger"])
 
-    # Exibir gráfico de candle com indicadores sobrepostos
     st.subheader(f"Gráfico de Candle com Indicadores para {codigo_ativo}")
     plotar_candle_com_indicadores(dados, indicadores)
 
-    # Botão para exportar gráfico
     if st.button("Exportar gráfico"):
         exportar_grafico(dados)
 else:
     st.sidebar.write("Digite o código de um ativo para começar.")
 
-# Cache - Limpar manualmente
 if st.sidebar.button("Limpar Cache"):
     st.cache_data.clear()
     st.sidebar.write("Cache limpo com sucesso.")
