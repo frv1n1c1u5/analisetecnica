@@ -1,75 +1,79 @@
 import streamlit as st
-import yfinance as yf
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import pandas as pd
-import ta
+import plotly.express as px
+from fpdf import FPDF
 
-@st.cache_data
-def carregar_dados(ativo, periodo):
-    data = yf.download(ativo, period=periodo, interval="1d", progress=False)
-    return data[data['Volume'] > 0].dropna()
+# Função para carregar e validar dados
+def load_data(uploaded_file):
+    df = pd.read_excel(uploaded_file)
+    required_columns = [
+        'Assessor', 'Cliente', 'Receita no Mês', 'Receita Bovespa', 
+        'Receita Futuros', 'Receita RF Bancários', 'Receita RF Privados', 
+        'Receita RF Públicos', 'Captação Bruta em M', 'Resgate em M', 'Captação Líquida em M'
+    ]
+    if not all(col in df.columns for col in required_columns):
+        st.error("A planilha deve conter as colunas necessárias.")
+        return None
+    return df
 
-def plotar_candle_com_indicadores(data, indicadores_selecionados):
-    fig = make_subplots(rows=1, cols=1, shared_xaxes=True, subplot_titles=('Preço e Indicadores',))
-
-    fig.add_trace(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name='Candlestick'))
-
-    if "Média Móvel" in indicadores_selecionados:
-        data['SMA'] = ta.trend.SMAIndicator(data['Close'], window=14).sma_indicator()
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA'], mode='lines', name='Média Móvel', line=dict(color='blue')))
-    
-    if "RSI" in indicadores_selecionados:
-        data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-        fig.add_trace(go.Scatter(x=data.index, y=data['RSI'], mode='lines', name='RSI', yaxis="y2", line=dict(color='green')))
-
-    if "MACD" in indicadores_selecionados:
-        macd = ta.trend.MACD(data['Close'])
-        data['MACD'] = macd.macd()
-        data['Signal'] = macd.macd_signal()
-        fig.add_trace(go.Scatter(x=data.index, y=data['MACD'], mode='lines', name='MACD', yaxis="y3", line=dict(color='orange')))
-        fig.add_trace(go.Scatter(x=data.index, y=data['Signal'], mode='lines', name='Signal MACD', yaxis="y3", line=dict(color='purple')))
-
-    if "Bandas de Bollinger" in indicadores_selecionados:
-        bb = ta.volatility.BollingerBands(data['Close'])
-        data['BB_upper'] = bb.bollinger_hband()
-        data['BB_middle'] = bb.bollinger_mavg()
-        data['BB_lower'] = bb.bollinger_lband()
-        fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], mode='lines', name='Banda Superior', line=dict(color='red')))
-        fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], mode='lines', name='Banda Média', line=dict(color='yellow')))
-        fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], mode='lines', name='Banda Inferior', line=dict(color='red')))
-
-    fig.update_layout(
-        title='Gráfico de Candle com Indicadores',
-        yaxis_title='Preço',
-        xaxis_title='Data',
-        height=600,
-        yaxis2=dict(title='RSI', overlaying='y', side='right', showgrid=False),
-        yaxis3=dict(title='MACD', overlaying='y', side='right', showgrid=False),
-        showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-
-    fig.update_xaxes(rangeslider_visible=False)
-    st.plotly_chart(fig, use_container_width=True)
-
-st.title("Análise Técnica de Ativos - B3")
-
-codigo_ativo = st.text_input("Digite o código do ativo (ex: PETR4.SA)")
-periodo = st.selectbox("Período", ["1mo", "3mo", "6mo", "1y", "2y", "5y"])
-
-if codigo_ativo:
-    st.write(f"Carregando dados para {codigo_ativo}...")
-    dados = carregar_dados(codigo_ativo, periodo)
-
-    if not dados.empty:
-        indicadores = st.multiselect("Selecione os indicadores técnicos", ["Média Móvel", "RSI", "MACD", "Bandas de Bollinger"])
-        plotar_candle_com_indicadores(dados, indicadores)
+# Função para exibir ranking por receita
+def display_ranking(df, filter_assessor, filter_produto):
+    if filter_assessor:
+        df = df[df['Assessor'] == filter_assessor]
+    if filter_produto:
+        df = df[['Assessor', filter_produto]].groupby('Assessor').sum()
     else:
-        st.error("Não foi possível obter dados para o ativo especificado. Verifique se o código está correto.")
-else:
-    st.write("Digite o código de um ativo para começar.")
+        df = df.groupby('Assessor')['Receita no Mês'].sum()
+    
+    df = df.sort_values(ascending=False)
+    df = df.apply(lambda x: f"R$ {x:,.2f}")  # Formatação de moeda
+    st.write(df)
+    return df
 
-if st.button("Limpar Cache"):
-    st.cache_data.clear()
-    st.success("Cache limpo com sucesso.")
+# Função para exportar o ranking como PDF
+def export_to_pdf(data):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Ranking de Desempenho dos Assessores", ln=True, align='C')
+    pdf.ln(10)
+    
+    for index, value in data.items():
+        pdf.cell(200, 10, txt=f"{index}: {value}", ln=True)
+    
+    output_path = "/tmp/ranking.pdf"
+    pdf.output(output_path)
+    return output_path
+
+# Interface principal do aplicativo
+st.title("Ranking de Desempenho dos Assessores")
+uploaded_file = st.file_uploader("Faça o upload da planilha", type=["xlsx"])
+
+if uploaded_file:
+    df = load_data(uploaded_file)
+    if df is not None:
+        # Filtros na barra lateral
+        st.sidebar.subheader("Filtros")
+        filter_assessor = st.sidebar.selectbox("Selecione o Assessor", options=[None] + list(df['Assessor'].unique()))
+        filter_produto = st.sidebar.selectbox("Selecione o Tipo de Produto", options=[None, 'Receita Bovespa', 'Receita Futuros', 'Receita RF Bancários', 'Receita RF Privados', 'Receita RF Públicos'])
+
+        # Mostrar ranking e gráfico em abas
+        tab1, tab2 = st.tabs(["Tabela de Ranking", "Gráfico de Desempenho"])
+        
+        with tab1:
+            st.subheader("Ranking por Receita")
+            ranking_data = display_ranking(df, filter_assessor, filter_produto)
+
+            if st.button("Exportar Ranking para PDF"):
+                pdf_path = export_to_pdf(ranking_data)
+                with open(pdf_path, "rb") as pdf_file:
+                    st.download_button(label="Baixar PDF", data=pdf_file, file_name="ranking.pdf", mime="application/pdf")
+        
+        with tab2:
+            st.subheader("Gráfico de Desempenho")
+            if filter_produto:
+                fig = px.bar(df, x=df.index, y=filter_produto, labels={'y': filter_produto})
+            else:
+                fig = px.bar(df, x=df.index, y='Receita no Mês', labels={'y': 'Receita no Mês'})
+            fig.update_traces(texttemplate='%{y:.2f}', textposition='outside')
+            st.plotly_chart(fig)
