@@ -1,6 +1,5 @@
 streamlit
-yfinance
 pandas
-ta
 plotly
-Pillow
+openpyxl  # Necessário para leitura de arquivos Excel (.xlsx)
+fpdf  # Para gerar PDFs
